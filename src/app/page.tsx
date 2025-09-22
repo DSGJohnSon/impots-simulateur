@@ -1,103 +1,194 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import { useEffect, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
+import { MainMetrics, RevenueBreakdown, TaxCalculation, ProjectStatus, FundingSources, RevenueTrend } from '@/components/ui/Widgets'
+import { supabase } from '@/lib/supabase'
+import {
+  calculateTax,
+  formatEuros,
+  calculateRevenusByType,
+  type Revenu,
+  type Don
+} from '@/lib/tax-calculator'
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default function Dashboard() {
+  const [revenus, setRevenus] = useState<Revenu[]>([])
+  const [dons, setDons] = useState<Don[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      const currentYear = new Date().getFullYear()
+
+      // Récupérer les revenus de l'année en cours
+      const { data: revenusData, error: revenusError } = await supabase
+        .from('revenus')
+        .select('*')
+        .gte('date', `${currentYear}-01-01`)
+        .lte('date', `${currentYear}-12-31`)
+        .order('date', { ascending: false })
+
+      if (revenusError) throw revenusError
+
+      // Récupérer les dons de l'année en cours
+      const { data: donsData, error: donsError } = await supabase
+        .from('dons')
+        .select('*')
+        .gte('date', `${currentYear}-01-01`)
+        .lte('date', `${currentYear}-12-31`)
+        .order('date', { ascending: false })
+
+      if (donsError) throw donsError
+
+      setRevenus(revenusData || [])
+      setDons(donsData || [])
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
+          <div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-t-accent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+    )
+  }
+
+  const taxCalculation = calculateTax(revenus, dons)
+  const revenusByType = calculateRevenusByType(revenus)
+  const totalRevenus = revenus.reduce((sum, r) => sum + r.montant, 0)
+  const totalDons = dons.reduce((sum, d) => sum + d.montant, 0)
+
+  const currentYear = new Date().getFullYear()
+
+  // Données simulées pour les widgets inspirés des screenshots
+  const monthlyData = [45000, 52000, 48000, 61000, 55000, 67000, 58000, 63000, 59000, 65000, 61000, 68000]
+  const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
+  return (
+    <div className="space-y-8">
+      {/* En-tête */}
+      <div className="text-center space-y-6 animate-fade-in-up">
+        <div className="space-y-2">
+          <h1 className="text-5xl font-bold tracking-tight">
+            <span className="text-white">Dashboard</span>{' '}
+            <span className="text-gradient">Année {currentYear}</span>
+          </h1>
+          <div className="w-24 h-1 bg-gradient-to-r from-primary to-accent mx-auto rounded-full"></div>
+        </div>
+        <p className="text-xl text-foreground-secondary max-w-2xl mx-auto leading-relaxed">
+          Récapitulatif de vos revenus et simulation d&apos;impôts avec analyse avancée
+        </p>
+      </div>
+
+      {/* Métriques principales */}
+      <MainMetrics
+        totalRevenus={totalRevenus}
+        impotEstime={taxCalculation.impotNet}
+        mensualite={taxCalculation.montantMensuelAMettreDeCote}
+        totalDons={totalDons}
+      />
+
+      {/* Grille de widgets principaux */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="animate-fade-in-up">
+          <RevenueBreakdown
+            salaires={revenusByType.salaire}
+            autoEntrepreneurBIC={revenusByType.auto_entrepreneur_bic}
+            autoEntrepreneurBNC={revenusByType.auto_entrepreneur_bnc}
+            chomage={revenusByType.chomage}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+        </div>
+
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <TaxCalculation
+            revenuImposable={taxCalculation.revenuImposable}
+            impotBrut={taxCalculation.impotBrut}
+            reductionDons={taxCalculation.reductionDons}
+            impotNet={taxCalculation.impotNet}
+            tauxMoyen={taxCalculation.tauxMoyenImposition}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+        </div>
+      </div>
+
+      {/* Widgets additionnels inspirés des screenshots */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="animate-fade-in-up">
+          <ProjectStatus
+            projectName="Projet Fiscal 2025"
+            totalBudget={totalRevenus}
+            budgetUsed={totalRevenus * 0.7}
+            scheduleProgress={75}
+            riskLevel="low"
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <FundingSources
+            cashEquity={totalRevenus * 0.4}
+            bankLoan={totalRevenus * 0.35}
+            personalLoan={totalRevenus * 0.25}
+          />
+        </div>
+
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <RevenueTrend
+            monthlyData={monthlyData}
+            months={months}
+          />
+        </div>
+      </div>
+
+      {/* Derniers revenus ajoutés */}
+      {revenus.length > 0 && (
+        <Card variant="default" className="animate-fade-in-up">
+          <CardHeader>
+            <CardTitle variant="gradient">Derniers revenus ajoutés</CardTitle>
+            <CardDescription>Les 5 derniers revenus enregistrés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="table-modern">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Organisme</th>
+                    <th>Type</th>
+                    <th>Montant</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {revenus.slice(0, 5).map((revenu, index) => (
+                    <tr key={revenu.id} style={{ animationDelay: `${index * 0.1}s` }} className="animate-slide-in-right">
+                      <td className="text-white">
+                        {new Date(revenu.date).toLocaleDateString('fr-FR')}
+                      </td>
+                      <td className="text-white">{revenu.organisme}</td>
+                      <td className="text-foreground-secondary">
+                        {revenu.type_revenu.replace('_', ' ')}
+                      </td>
+                      <td className="font-semibold text-accent">
+                        {formatEuros(revenu.montant)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
-  );
+  )
 }
