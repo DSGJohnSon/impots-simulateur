@@ -16,14 +16,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fr" className="dark">
-      <body className={`${inter.className} antialiased`}>
+    <html lang="fr" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <div className="min-h-screen bg-background">
           <Navigation />
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <div className="space-y-6 animate-fade-in-up">
-              {children}
-            </div>
+            {children}
           </main>
         </div>
       </body>
